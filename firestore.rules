@@ -1,0 +1,51 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owns(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validProfile(userId) {
+      let data = request.resource.data;
+      return data.keys().hasOnly([
+          'uid', 'email', 'displayName', 'photoURL', 'phone', 'businessName',
+          'businessType', 'address', 'lowStockAlerts', 'orderSeq', 'createdAt',
+          'updatedAt', 'phoneNumber'
+        ])
+        && (!('uid' in data) || data.uid == userId)
+        && (!('email' in data) || data.email is string)
+        && (!('displayName' in data) || data.displayName is string)
+        && (!('photoURL' in data) || data.photoURL is string)
+        && (!('phone' in data) || data.phone is string)
+        && (!('phoneNumber' in data) || data.phoneNumber is string)
+        && (!('businessName' in data) || data.businessName is string)
+        && (!('businessType' in data) || data.businessType is string)
+        && (!('address' in data) || data.address is string)
+        && (!('lowStockAlerts' in data) || data.lowStockAlerts is bool)
+        && (!('orderSeq' in data) || (data.orderSeq is int && data.orderSeq >= 0))
+        && (!('createdAt' in data) || data.createdAt is number)
+        && (!('updatedAt' in data) || data.updatedAt is timestamp);
+    }
+
+    match /users/{userId} {
+      allow read: if owns(userId);
+      allow create: if owns(userId) && validProfile(userId);
+      allow update: if owns(userId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'uid', 'email', 'displayName', 'photoURL', 'phone', 'businessName',
+          'businessType', 'address', 'lowStockAlerts', 'orderSeq', 'updatedAt',
+          'phoneNumber'
+        ])
+        && validProfile(userId);
+      allow delete: if false;
+
+      match /{collectionName}/{documentId} {
+        allow read, write: if owns(userId)
+          && collectionName in ['products', 'orders', 'staff', 'suppliers', 'skuIndex'];
+        allow read, create: if owns(userId) && collectionName == 'activity';
+        allow update, delete: if false;
+      }
+    }
+  }
+}

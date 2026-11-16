@@ -1,0 +1,108 @@
+import { Brand } from "@/constants/brand";
+
+const group = (n: number) => Math.floor(Math.abs(n)).toLocaleString("en-NG");
+
+/** ₦12,345.60 */
+export function formatMoney(value: number, opts: { decimals?: boolean; sign?: boolean } = {}) {
+  const { decimals = true, sign = false } = opts;
+  const abs = Math.abs(value);
+  const cents = Math.round((abs - Math.floor(abs)) * 100)
+    .toString()
+    .padStart(2, "0");
+  const body = `${Brand.currency}${group(abs)}${decimals ? "." + cents : ""}`;
+  if (!sign) return value < 0 ? `-${body}` : body;
+  return value < 0 ? `-${body}` : `+${body}`;
+}
+
+/** Splits an amount for the "big number, small decimals" display. */
+export function splitMoney(value: number) {
+  const abs = Math.abs(value);
+  const cents = Math.round((abs - Math.floor(abs)) * 100)
+    .toString()
+    .padStart(2, "0");
+  return { whole: group(value), cents };
+}
+
+/** 1.2M / 45K style shorthand. */
+export function compactMoney(value: number) {
+  const abs = Math.abs(value);
+  const fmt = (n: number, s: string) => `${Brand.currency}${n.toFixed(1).replace(/\.0$/, "")}${s}`;
+  if (abs >= 1_000_000) return fmt(value / 1_000_000, "M");
+  if (abs >= 1_000) return fmt(value / 1_000, "K");
+  return `${Brand.currency}${Math.round(value)}`;
+}
+
+export function parseAmount(text: string) {
+  const cleaned = String(text).replace(/,/g, "").replace(/[^\d.-]/g, "");
+  if (!/^-?(?:\d+\.?\d*|\.\d+)$/.test(cleaned)) return 0;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Formats as the user types: "12500" -> "12,500" */
+export function groupDigits(text: string) {
+  const clean = text.replace(/[^0-9.]/g, "");
+  const [whole, dec] = clean.split(".");
+  const grouped = (whole || "").replace(/^0+(?=\d)/, "").replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return dec !== undefined ? `${grouped || "0"}.${dec.slice(0, 2)}` : grouped;
+}
+
+const DAY = 86_400_000;
+export const startOfDay = (t: number) => {
+  const d = new Date(t);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
+export function dayLabel(ts: number, now = Date.now()) {
+  const diff = Math.round((startOfDay(now) - startOfDay(ts)) / DAY);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  return new Date(ts).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+}
+
+export function timeLabel(ts: number) {
+  return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+export function fullDate(ts: number) {
+  return `${new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} · ${timeLabel(ts)}`;
+}
+
+export function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join("");
+}
+
+export function greeting(now = new Date()) {
+  const h = now.getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+export const plural = (n: number, one: string, many = one + "s") => `${n.toLocaleString("en-NG")} ${n === 1 ? one : many}`;
+
+/** 1,250 */
+export const num = (n: number) => Math.round(n).toLocaleString("en-NG");
+
+/** "Thu 12 Nov" */
+export const shortDate = (ts: number) =>
+  new Date(ts).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+
+export function timeAgo(ts: number, now = Date.now()) {
+  const s = Math.max(0, Math.round((now - ts) / 1000));
+  if (s < 60) return "Just now";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.round(h / 24);
+  if (d === 1) return "Yesterday";
+  if (d < 7) return `${d} days ago`;
+  return new Date(ts).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
